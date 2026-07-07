@@ -32,7 +32,7 @@ async function refreshOnce(env: Env): Promise<string | null> {
     await new Promise((r) => setTimeout(r, 800));
     return env.TOKEN_STORE.get(K.access); // coalesce concurrent 401s onto one refresh
   }
-  await env.TOKEN_STORE.put(K.lock, "1", { expirationTtl: 5 });
+  await env.TOKEN_STORE.put(K.lock, "1", { expirationTtl: 60 }); // KV min ttl is 60s
   try {
     const rt = await env.TOKEN_STORE.get(K.refresh);
     if (!rt) return null;
@@ -51,6 +51,8 @@ async function refreshOnce(env: Env): Promise<string | null> {
     await env.TOKEN_STORE.put(K.access, j.access_token, { expirationTtl: j.expires_in ?? 3600 });
     await env.TOKEN_STORE.put(K.refresh, j.refresh_token); // ROTATION
     return j.access_token;
+  } catch {
+    return null; // refresh hiccup → degrade to 401, never 500 the endpoint
   } finally {
     await env.TOKEN_STORE.delete(K.lock);
   }
