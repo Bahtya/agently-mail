@@ -1,5 +1,14 @@
 # agently-mail — agent.qq.com on Cloudflare Workers
 
+[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+[![status: live-verified](https://img.shields.io/badge/status-live--verified-brightgreen)](https://agently-mail.bahtyar153.workers.dev/me)
+
+**Live worker:** <https://agently-mail.bahtyar153.workers.dev> ｜ **API docs:** [`API.md`](./API.md) ｜ **Status:** reverse-engineered & live-verified 2026-07-07
+
+---
+
 Drives Tencent **Agently Mail** (`@agent.qq.com`) directly from a Cloudflare Worker:
 receive (list / read / search) + send (two-phase). Reverse-engineered from
 `@tencent-qqmail/agently-cli` v1.0.7 and **verified live on 2026-07-07** against the
