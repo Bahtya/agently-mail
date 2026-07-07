@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "agently-mail",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-01",
+  "kv_namespaces": [
+    { "binding": "TOKEN_STORE", "id": "e213ba8a130a470f93720e3dcec4fa97" }
+  ]
+}

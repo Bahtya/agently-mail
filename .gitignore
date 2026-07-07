@@ -1,0 +1,16 @@
+# build / cache
+.wrangler/
+node_modules/
+dist/
+
+# local secrets — never commit
+.dev.vars
+.api_token
+*.token
+at.txt
+rt.txt
+captured.txt
+
+# env
+.env
+.env.*
