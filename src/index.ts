@@ -15,6 +15,9 @@
 export interface Env {
   TOKEN_STORE: KVNamespace; // holds the live (rotating) access_token + refresh_token + alias_id
   API_TOKEN: string; // shared secret gating this Worker's own HTTP API (wrangler secret)
+  // Hermux license-api admin key — the */2 cron backstop uses it to kick the
+  // email outbox drain (断链/退避行兜底，「必须发完」第三层).
+  HERMUX_ADMIN_KEY?: string;
   // optional: override the public client_id if Tencent ever rotates it
   AGENTLY_CLIENT_ID?: string;
 }
@@ -164,8 +167,16 @@ export default {
     }
   },
 
-  // poll inbox every 2 min (beta cap: 10 req/min, 200/h)
+  // every 2 min: poll inbox (beta cap: 10 req/min, 200/h) + kick the Hermux
+  // email-outbox drain as the「必须发完」backstop (chain break / backoff rows).
   async scheduled(_e: ScheduledEvent, env: Env): Promise<void> {
+    if (env.HERMUX_ADMIN_KEY) {
+      await fetch("https://hermux-license-api.pages.dev/functions/v1/admin/email/drain", {
+        method: "POST",
+        headers: { "x-admin-key": env.HERMUX_ADMIN_KEY, "content-type": "application/json" },
+        body: "{}",
+      }).catch((e) => console.log(`hermux drain kick failed: ${e}`));
+    }
     const aid = await aliasId(env).catch(() => null);
     if (!aid) return;
     const seen = await env.TOKEN_STORE.get(K.seen);
