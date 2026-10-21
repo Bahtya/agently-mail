@@ -80,6 +80,16 @@ wrangler deploy
 
 ### 写入 token 到 KV(⚠️ Termux 上的坑)
 
+Worker 把 `access_token` + `refresh_token` 合存在**一个** KV key 里(刷新从 3 次写降到 2 次写,
+避免 cron 把 Workers KV 免费额度 1,000 写/天 写爆):
+
+| key | 内容 | 写入方 |
+|---|---|---|
+| `auth_bundle` | JSON `{"access":"…","refresh":"…"}` | 首次手动灌入;之后 Worker 自动轮换 |
+| `alias_id` | 主别名 id | Worker 首次运行自动写入 |
+| `last_seen_msg_id` | 最近已见 `message_id` 的 JSON 数组(最多 200 个) | **仅在新邮件出现时**写 |
+| `refreshing` | 刷新锁(TTL 60s) | Worker |
+
 `wrangler kv key put` 在 Termux/Android 上会 spawn workerd 子进程而失败(`Error: spawn …/workerd`)。
 **改用 Cloudflare REST API** 直接写 KV(账号信息见 `wrangler whoami` / `wrangler kv namespace list`):
 
@@ -88,14 +98,13 @@ ACCT=<Account ID>                 # wrangler whoami
 NS=<TOKEN_STORE 的 namespace id>  # wrangler kv namespace list
 TOK="$CLOUDFLARE_API_TOKEN"       # wrangler 登录后此环境变量已设
 
-curl -X PUT "https://api.cloudflare.com/client/v4/accounts/$ACCT/storage/kv/namespaces/$NS/values/access_token?expiration_ttl=3600" \
-  -H "Authorization: Bearer $TOK" -H "Content-Type: text/plain" --data-binary "<access_token>"
-
-curl -X PUT "https://api.cloudflare.com/client/v4/accounts/$ACCT/storage/kv/namespaces/$NS/values/refresh_token" \
-  -H "Authorization: Bearer $TOK" -H "Content-Type: text/plain" --data-binary "<refresh_token>"
+curl -X PUT "https://api.cloudflare.com/client/v4/accounts/$ACCT/storage/kv/namespaces/$NS/values/auth_bundle" \
+  -H "Authorization: Bearer $TOK" -H "Content-Type: text/plain" \
+  --data-binary '{"access":"<access_token>","refresh":"<refresh_token>"}'
 ```
-> `access_token` 加 `expiration_ttl=3600` 让 KV 自动过期(Worker 遇 401 会用 refresh_token 重刷并写回)。
-> `refresh_token` 不设 TTL(长期有效,每次刷新轮换)。
+> 不需要给 `auth_bundle` 设 TTL:access 过期由 Worker 遇 401 自动刷新并写回。
+> 升级前的旧部署用的是两个独立 key `access_token` / `refresh_token`:Worker 在下一次刷新成功后会
+> **自动迁移**成 `auth_bundle` 并删除旧 key。迁移之后再灌 token,直接覆盖 `auth_bundle` 即可。
 
 ### 设 Worker 自身鉴权密钥(API_TOKEN)+ 重置
 
@@ -118,7 +127,9 @@ POST /send/confirm {"msg":{…same…},"confirmation_token":"ctk_…"}          
 ```
 
 Cron `*/2 * * * *` polls the inbox and logs new `message_id`s (wire a Queue/webhook to
-push to your agent).
+push to your agent). It writes KV **only when a new mail id appears** — keep it that way:
+the Workers Free plan allows 1,000 KV writes/day, and a per-tick write (as in the old
+implementation) burns ~79% of that budget for nothing.
 
 ## The one real risk — 已验证通过
 
